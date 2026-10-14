@@ -3,7 +3,7 @@ package com.rainweaver.moneymgr.data
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-enum class TxType { INCOME, EXPENSE }
+enum class TxType { INCOME, EXPENSE, TRANSFER }
 
 /**
  * A single financial transaction.
