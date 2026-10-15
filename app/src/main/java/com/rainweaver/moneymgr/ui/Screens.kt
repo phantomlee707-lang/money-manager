@@ -32,31 +32,45 @@ fun DashboardScreen(vm: MoneyViewModel, onEdit: (Transaction?) -> Unit, onReques
     val periodTx = remember(transactions, vm.selectedMonth) { vm.txInMonth(vm.selectedMonth) }
     val inc = remember(periodTx) { periodTx.filter { it.type == TxType.INCOME }.sumOf { it.amountMinor } }
     val exp = remember(periodTx) { periodTx.filter { it.type == TxType.EXPENSE }.sumOf { it.amountMinor } }
-    val bal = inc - exp
-    val monthly = remember(transactions) { vm.monthlySummary(6) }
+    val opening = remember(transactions, vm.selectedMonth) { vm.balanceBefore(vm.selectedMonth) }
+    val sortedTx = remember(periodTx) { periodTx.sortedWith(compareBy({ it.dateEpochDay }, { it.createdAt })) }
+    val runningPairs = remember(sortedTx, opening) {
+        var run = opening
+        sortedTx.map { tx ->
+            run += when (tx.type) {
+                TxType.INCOME -> tx.amountMinor
+                TxType.EXPENSE -> -tx.amountMinor
+                TxType.TRANSFER -> 0L
+            }
+            tx to run
+        }
+    }
+    val closing = runningPairs.lastOrNull()?.second ?: opening
+    val byCat = remember(transactions, vm.selectedMonth) { vm.expenseByCategory(vm.selectedMonth) }
     Column(Modifier.fillMaxSize()) {
         TopAppBar(title = { Column {
             Text("Money Manager")
             Text("Rainweaver Studio", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
         } }, actions = { TextButton(onClick = onRequestExport) { Text("Export as PDF") } })
-        Column(Modifier.padding(16.dp)) {
-            MonthSelector(vm.selectedMonth, { vm.shiftMonth(-1) }, { vm.shiftMonth(1) })
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SummaryCard("Income", money(inc), Modifier.weight(1f))
-                SummaryCard("Expense", money(exp), Modifier.weight(1f))
-                SummaryCard("Balance", money(bal), Modifier.weight(1f))
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { ProfileHeader(vm.userName) }
+            item { MonthSelector(vm.selectedMonth, { vm.shiftMonth(-1) }, { vm.shiftMonth(1) }) }
+            item { StatementSummaryCard(opening, inc, exp, closing, money) }
+            item { SectionLabel("Transactions") }
+            if (runningPairs.isEmpty()) {
+                item { Text("No transactions this month yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp) }
+            } else {
+                items(runningPairs, key = { it.first.id }) { (tx, run) ->
+                    StatementTxRow(tx, run, money, dateStr, { onEdit(tx) }, { onDelete(tx) })
+                }
             }
-            Spacer(Modifier.height(16.dp))
-            Text("Last 6 months", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Spacer(Modifier.height(8.dp))
-            MonthlyBarChart(monthly, money)
-            Spacer(Modifier.height(16.dp))
-            Text("Recent transactions", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Spacer(Modifier.height(8.dp))
-            LazyColumn(Modifier.fillMaxSize()) {
-                items(periodTx) { tx -> TxRow(tx, money, dateStr, { onEdit(tx) }, { onDelete(tx) }) }
-            }
+            item { Spacer(Modifier.height(8.dp)) }
+            item { SectionLabel("Spending by category") }
+            item { CategoryBars(byCat, money) }
         }
     }
 }
@@ -156,6 +170,12 @@ fun SettingsScreen(vm: MoneyViewModel, scope: kotlinx.coroutines.CoroutineScope,
 
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
         Text("Settings", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Spacer(Modifier.height(16.dp))
+        Text("Your name", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(vm.userName, { vm.saveUserName(it) }, label = { Text("Name (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(4.dp))
+        Text("Shown on your dashboard profile. Saved automatically.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))
         Text("Currency label", fontWeight = FontWeight.Bold, fontSize = 13.sp)
         Spacer(Modifier.height(6.dp))

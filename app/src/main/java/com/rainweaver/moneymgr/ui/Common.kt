@@ -1,16 +1,19 @@
 package com.rainweaver.moneymgr.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -46,6 +49,78 @@ fun MonthSelector(ym: YearMonth, onPrev: () -> Unit, onNext: () -> Unit) {
         TextButton(onClick = onPrev) { Text("‹") }
         Text("${ym.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${ym.year}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         TextButton(onClick = onNext) { Text("›") }
+    }
+}
+
+// ---------- bank-statement style components ----------
+
+@Composable
+fun ProfileHeader(name: String) {
+    val initial = name.trim().firstOrNull()?.uppercase() ?: "M"
+    val greeting = if (name.isBlank()) "Your personal ledger" else "Hi, ${name.trim().split(" ").first()}"
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(52.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+            Text(initial, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+        }
+        Spacer(Modifier.width(14.dp))
+        Column {
+            Text(greeting, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Fully offline · data stays on this device", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+fun SectionLabel(text: String) {
+    Text(text, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(top = 4.dp))
+}
+
+/** Bank-statement style period summary: opening / in / out / closing. */
+@Composable
+fun StatementSummaryCard(opening: Long, income: Long, expense: Long, closing: Long, money: (Long) -> String) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            StatementLine("Opening balance", money(opening))
+            StatementLine("Money in", "+${money(income)}", MaterialTheme.colorScheme.primary)
+            StatementLine("Money out", "-${money(expense)}", MaterialTheme.colorScheme.error)
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Closing balance", fontWeight = FontWeight.Bold)
+                Text(money(closing), fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                    color = if (closing < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatementLine(label: String, value: String, color: Color = MaterialTheme.colorScheme.onSurface) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, fontSize = 13.sp)
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = color)
+    }
+}
+
+/** A ledger line showing the signed amount and the running balance after it. */
+@Composable
+fun StatementTxRow(tx: Transaction, running: Long, money: (Long) -> String, dateStr: (Long) -> String, onClick: () -> Unit, onDelete: () -> Unit) {
+    val isIncome = tx.type == TxType.INCOME
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(tx.categoryName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text("${dateStr(tx.dateEpochDay)}${if (tx.note.isNotBlank()) " · ${tx.note}" else ""}",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 4.dp)) {
+                Text("${if (isIncome) "+" else "-"}${money(tx.amountMinor)}", fontWeight = FontWeight.Bold,
+                    color = if (isIncome) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                Text("bal ${money(running)}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
+            }
+        }
     }
 }
 

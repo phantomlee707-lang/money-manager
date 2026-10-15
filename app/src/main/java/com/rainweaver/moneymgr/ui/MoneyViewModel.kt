@@ -37,6 +37,10 @@ class MoneyViewModel(app: Application) : AndroidViewModel(app) {
     var dateFormat by mutableStateOf(settings.dateFormat)
     var defaultPeriod by mutableStateOf(settings.defaultPeriod)
 
+    // profile
+    var userName by mutableStateOf(settings.userName)
+    fun saveUserName(n: String) { userName = n; settings.userName = n }
+
     // selected dashboard period (a calendar month)
     var selectedMonth by mutableStateOf(YearMonth.now())
 
@@ -46,6 +50,7 @@ class MoneyViewModel(app: Application) : AndroidViewModel(app) {
         settings.currency = currency; settings.decimals = decimals
         settings.separator = separator; settings.dateFormat = dateFormat
         settings.defaultPeriod = defaultPeriod
+        settings.userName = userName
     }
 
     fun money(minor: Long): String = MoneyFmt.format(minor, currency, decimals, separator)
@@ -68,6 +73,15 @@ class MoneyViewModel(app: Application) : AndroidViewModel(app) {
     // selectedMonth) so they stay memoized yet redraw the instant the DB changes.
     fun shiftMonth(delta: Long) { selectedMonth = selectedMonth.plusMonths(delta) }
     fun setMonth(ym: YearMonth) { selectedMonth = ym }
+
+    /** Net balance of all transactions dated before [ym] (income − expense). */
+    fun balanceBefore(ym: YearMonth): Long =
+        transactions.value.filter { LocalDate.ofEpochDay(it.dateEpochDay) < ym.atDay(1) }
+            .sumOf { when (it.type) {
+                TxType.INCOME -> it.amountMinor
+                TxType.EXPENSE -> -it.amountMinor
+                TxType.TRANSFER -> 0L
+            } }
 
     /** Last [count] months (oldest→newest) with income/expense totals, for charts. */
     fun monthlySummary(count: Int = 6): List<Triple<YearMonth, Long, Long>> {

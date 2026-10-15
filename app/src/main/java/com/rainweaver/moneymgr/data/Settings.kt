@@ -29,6 +29,11 @@ class Settings(context: Context) {
         get() = prefs.getString("defaultPeriod", "month") ?: "month"
         set(v) = prefs.edit().putString("defaultPeriod", v).apply()
 
+    /** Display name shown on the dashboard profile header. */
+    var userName: String
+        get() = prefs.getString("userName", "") ?: ""
+        set(v) = prefs.edit().putString("userName", v).apply()
+
     companion object {
         val CURRENCIES = listOf("$", "€", "£", "¥", "Rp", "₹", "₩", "R$", "RM", "฿")
         val SEPARATORS = listOf("comma" to "1,234.56", "dot" to "1.234,56", "space" to "1 234.56", "none" to "1234.56")
